@@ -7,8 +7,6 @@ TelegramBot::TelegramBot(const char* token, Client &client) {
 TelegramBot::TelegramBot(const String &token, Client &client) {
   _token = token;
   _client = &client;
-
-  _json_buffer = DynamicJsonBuffer(1024);
 }
 
 void TelegramBot::set_debug_serial(Stream* stream) {
@@ -28,15 +26,23 @@ uint8_t TelegramBot::begin(void) {
 }
 
 uint32_t TelegramBot::send_message(const String& chat_id, const String& text) {
-  JsonObject& data = _json_buffer.createObject();
+  DynamicJsonBuffer json_buffer(1024);
+  JsonObject& data = json_buffer.createObject();
   data["chat_id"] = chat_id;
   data["text"] = text;
 
-  JsonObject* response = _send("/sendMessage", data);
+  String json_string;
 
-  if (response == NULL) return 0;
+  data.printTo(json_string);
 
-  JsonObject& json = *response;
+  String response;
+  uint16_t response_length = _send("/sendMessage", json_string, response);
+
+  if (response_length == 0) return 0;
+
+  DEBUGLN(response);
+
+  JsonObject& json = json_buffer.parseObject(response);
 
   bool ok = json["ok"];
 
@@ -53,16 +59,23 @@ uint32_t TelegramBot::send_message(const String& chat_id, const String& text) {
 }
 
 uint8_t TelegramBot::edit_message(const String& chat_id, uint32_t message_id, const String& text) {
-  JsonObject& data = _json_buffer.createObject();
+  DynamicJsonBuffer json_buffer(1024);
+  JsonObject& data = json_buffer.createObject();
   data["chat_id"] = chat_id;
   data["message_id"] = message_id;
   data["text"] = text;
 
-  JsonObject* response = _send("/editMessageText", data);
+  String json_string;
 
-  if (response == NULL) return 0;
+  data.printTo(json_string);
 
-  JsonObject& json = *response;
+  String response;
+  uint16_t response_length = _send("/editMessageText", json_string, response);
+
+  if (response_length == 0) return 0;
+  DEBUGLN(response);
+
+  JsonObject& json = json_buffer.parseObject(response);
 
   bool ok = json["ok"];
 
@@ -76,13 +89,10 @@ uint8_t TelegramBot::edit_message(const String& chat_id, uint32_t message_id, co
   return 1;
 }
 
-JsonObject* TelegramBot::_send(const String &endpoint, JsonObject& data) {
-  String payload;
-  data.printTo(payload);
-
+uint16_t TelegramBot::_send(const String &endpoint, const String &payload, String &response) {
   if (!_client->connect(TELEGRAM_API_HOST, 443)) {
     DEBUGLN("Failed to connect to TELEGRAM_API_HOST");
-    return NULL;
+    return 0;
   }
 
   //DEBUG("Payload: ");
@@ -137,25 +147,17 @@ JsonObject* TelegramBot::_send(const String &endpoint, JsonObject& data) {
     DEBUG(content_length);
     DEBUG(" bytes but only got ");
     DEBUGLN(_client->available());
-    return NULL;
+    return 0;
   }
 
   char json_string[content_length];
 
   _client->readBytes(json_string, content_length);
 
-  DEBUGLN(json_string);
+  //DEBUGLN(json_string);
 
   DEBUGLN("Parsing response...");
 
-  JsonObject& response = _json_buffer.parseObject(json_string);
-
-  if (!response.success()) {
-    DEBUGLN("Failed to parse response!");
-    return NULL;
-  }
-
-  DEBUGLN("Parsed successfully");
-
-  return &response;
+  response = json_string;
+  return content_length;
 }

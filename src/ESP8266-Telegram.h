@@ -20,12 +20,11 @@ class TelegramBot {
   private:
     String _token;
     Client* _client;
-    DynamicJsonBuffer _json_buffer;
     Stream* _debug_serial;
 
     const char* TELEGRAM_API_HOST = "api.telegram.org";
 
-    JsonObject* _send(const String &endpoint, JsonObject& data);
+    uint16_t _send(const String &endpoint, const String &payload, String &response);
 };
 
 #endif
