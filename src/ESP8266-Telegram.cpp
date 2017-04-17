@@ -52,6 +52,30 @@ uint32_t TelegramBot::send_message(const String& chat_id, const String& text) {
   return message_id;
 }
 
+uint8_t TelegramBot::edit_message(const String& chat_id, uint32_t message_id, const String& text) {
+  JsonObject& data = _json_buffer.createObject();
+  data["chat_id"] = chat_id;
+  data["message_id"] = message_id;
+  data["text"] = text;
+
+  JsonObject* response = _send("/editMessageText", data);
+
+  if (response == NULL) return 0;
+
+  JsonObject& json = *response;
+
+  bool ok = json["ok"];
+
+  if (!ok) {
+    DEBUG("TG Error: ");
+    String description = json["result"]["description"];
+    DEBUGLN(description);
+    return 0;
+  }
+
+  return 1;
+}
+
 JsonObject* TelegramBot::_send(const String &endpoint, JsonObject& data) {
   String payload;
   data.printTo(payload);
