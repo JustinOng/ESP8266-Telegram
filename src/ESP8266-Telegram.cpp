@@ -61,35 +61,29 @@ JsonObject* TelegramBot::_send(const String &endpoint, JsonObject& data) {
     return NULL;
   }
 
-  DEBUG("Payload: ");
-  DEBUGLN(payload);
+  //DEBUG("Payload: ");
+  //DEBUGLN(payload);
 
-  DEBUGLN("Sending request...");
-  _client->println("POST /bot"+_token+endpoint+" HTTP/1.1");
-	_client->println("Host: api.telegram.org");
-  _client->println("Content-Type: application/json");
-  //_client->println("Connection: close");
-  _client->print("Content-Length: "); _client->println(payload.length());
+  DEBUG("Sending request to ");
+  DEBUGLN(endpoint);
 
-  // blank line to indicate end of headers
-  _client->println();
+  uint32_t start_time = millis();
+  // writing multiple times with header Connection: close does not give a response back?
+  // https://github.com/esp8266/Arduino/issues/43#issuecomment-217454125
+  String tx_data = "POST /bot"+_token+endpoint+" HTTP/1.1\r\n" +
+  	"Host: api.telegram.org\r\n" +
+    "Content-Type: application/json\r\n" +
+    "Connection: close\r\n" +
+    "Content-Length: " + String(payload.length()) + "\r\n\r\n" +
+    payload + "\r\n";
 
-  _client->println(payload);
+  _client->print(tx_data);
 
-  _client->println();
+  DEBUG("Took ");
+  DEBUG(millis() - start_time);
+  DEBUGLN("ms");
 
   DEBUGLN("Waiting for response...");
-
-  /*uint32_t timeout = millis();
-
-  while(_client->connected() && _client->available() == 0) {
-    if ((millis() - timeout) > CONNECTION_TIMEOUT) {
-      DEBUGLN("Client timeout!");
-      _client->stop();
-      return NULL;
-    }
-    DEBUGLN(millis() - timeout);
-  }*/
 
   while(_client->available() == 0) {
     delay(100);
@@ -126,8 +120,6 @@ JsonObject* TelegramBot::_send(const String &endpoint, JsonObject& data) {
 
   _client->readBytes(json_string, content_length);
 
-  _client->stop();
-
   DEBUGLN(json_string);
 
   DEBUGLN("Parsing response...");
@@ -136,7 +128,10 @@ JsonObject* TelegramBot::_send(const String &endpoint, JsonObject& data) {
 
   if (!response.success()) {
     DEBUGLN("Failed to parse response!");
+    return NULL;
   }
+
+  DEBUGLN("Parsed successfully");
 
   return &response;
 }
